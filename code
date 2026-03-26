@@ -1,0 +1,135 @@
+#include <Servo.h>
+
+Servo motor;
+
+const int trigPin = 9;
+const int echoPin = 10;
+
+const int ledPin = 12;
+const int buzzerPin = 13;
+
+long duration;
+int distance;
+
+int pos = 0;
+int direction = 1;
+
+bool isStopped = false;
+
+long pulseDuration();
+int readUltrasonicFiltered();
+
+void setup() {
+  Serial.begin(115200);
+  motor.attach(11);
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  pinMode(ledPin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
+
+  digitalWrite(ledPin, LOW);
+  digitalWrite(buzzerPin, LOW);
+
+  digitalWrite(trigPin, LOW);
+  delay(50);
+}
+
+void loop() {
+
+  int dist = readUltrasonicFiltered();
+
+  if (dist >= 0) {
+    Serial.print("Distance: ");
+    Serial.print(dist);
+    Serial.println(" cm");
+  } else {
+    Serial.println("Distance: - (timeout / invalid)");
+  }
+
+  if (dist >= 0 && dist < 15) {
+
+    motor.write(pos);
+
+    if (!isStopped) {
+      Serial.println("Object detected");
+      isStopped = true;
+    }
+
+    if (dist < 7) {
+      digitalWrite(ledPin, HIGH);
+      digitalWrite(buzzerPin, HIGH);
+      delay(40);
+    }
+    else if (dist < 10) {
+      digitalWrite(ledPin, HIGH);
+      digitalWrite(buzzerPin, HIGH);
+      delay(120);
+      digitalWrite(ledPin, LOW);
+      digitalWrite(buzzerPin, LOW);
+      delay(120);
+    }
+    else {
+      digitalWrite(ledPin, HIGH);
+      digitalWrite(buzzerPin, HIGH);
+      delay(350);
+      digitalWrite(ledPin, LOW);
+      digitalWrite(buzzerPin, LOW);
+      delay(350);
+    }
+
+    return;
+  } 
+  else {
+
+    digitalWrite(ledPin, LOW);
+    digitalWrite(buzzerPin, LOW);
+
+    if (isStopped) {
+      Serial.println("");
+      isStopped = false;
+    }
+  }
+
+  motor.write(pos);
+  pos += direction * 3;
+
+  if (pos >= 180) { pos = 180; direction = -1; }
+  if (pos <= 0)   { pos = 0;   direction = 1;  }
+
+  delay(10);
+}
+
+int readUltrasonicFiltered() {
+  const int attempts = 3;
+  int readings = 0;
+  long sum = 0;
+
+  for (int i = 0; i < attempts; i++) {
+    long dur = pulseDuration();
+    if (dur > 0) {
+      int dcm = dur * 0.034 / 2.0;
+      if (dcm > 0 && dcm < 400) {
+        sum += dcm;
+        readings++;
+      }
+    }
+    delay(5);
+  }
+
+  if (readings == 0) return -1;
+  return (int)(sum / readings);
+}
+
+long pulseDuration() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long dur = pulseIn(echoPin, HIGH, 30000);
+  if (dur == 0) return -1;
+  return dur;
+}
